@@ -126,6 +126,16 @@ input.ltr{direction:ltr;text-align:left}
       </form>
     </section>
 
+    <section id="pkgSec" hidden>
+      <h2>📦 باقات الاشتراك <span class="n" id="pkgCount"></span></h2>
+      <p class="hint">علّم الباقات اللي بدك قنواتها تظهر. كل ما تختار أقل، التحميل أسرع.</p>
+      <div class="row" style="margin-bottom:10px">
+        <button class="btn" type="button" id="pkgAll">اختار الكل</button>
+        <button class="btn" type="button" id="pkgNone">مسح الكل</button>
+      </div>
+      <div class="chips" id="pkgs"></div>
+    </section>
+
     <section>
       <h2>★ المفضلة <span class="n" id="favCount"></span></h2>
       <p class="hint">بتضيف قنوات للمفضلة من التلفزيون بضغطة OK مطوّلة. ومن هون بتقدر تشيلها.</p>
@@ -278,11 +288,31 @@ input.ltr{direction:ltr;text-align:left}
     $('cats').innerHTML = cats.length ? cats.map(function (c) {
       return '<button class="chip' + (hidden.indexOf(c.id) !== -1 ? ' off' : '') + '" data-cat="' + esc(c.id) + '">' + esc(c.n) + ' <small>' + c.c + '</small></button>';
     }).join('') : '<div class="empty">التصنيفات بتظهر بعد ما التلفزيون يحمّل القنوات</div>';
+
+    // باقات الاشتراك
+    var xcats = state.x ? (state.xcats || []) : [];
+    $('pkgSec').hidden = !xcats.length;
+    if (xcats.length) {
+      var xsel = state.xsel === 'all' ? xcats.map(function (c) { return c.id; }) : (state.xsel || []);
+      $('pkgCount').textContent = xsel.length + '/' + xcats.length;
+      $('pkgs').innerHTML = xcats.map(function (c) {
+        return '<button class="chip' + (xsel.indexOf(c.id) === -1 ? ' off' : '') + '" data-pkg="' + esc(c.id) + '">' + esc(c.n) + '</button>';
+      }).join('');
+    }
+  }
+  function pkgSel() {
+    var xcats = (state && state.xcats) || [];
+    return state.xsel === 'all' ? xcats.map(function (c) { return c.id; }) : ((state && state.xsel) || []).slice();
+  }
+  function sendPkg(sel) {
+    var all = ((state && state.xcats) || []).map(function (c) { return c.id; });
+    var val = sel.length === all.length ? 'all' : sel;
+    send(function (s) { s.xsel = val; }, 'التلفزيون عم يحمّل الباقات...');
   }
 
   // ----- الأحداث -----
   document.addEventListener('click', function (e) {
-    var t = e.target.closest('[data-a],[data-del],[data-fav],[data-cat]');
+    var t = e.target.closest('[data-a],[data-del],[data-fav],[data-cat],[data-pkg]');
     if (!t) return;
     if (t.hasAttribute('data-del')) {
       var i = +t.getAttribute('data-del');
@@ -311,6 +341,16 @@ input.ltr{direction:ltr;text-align:left}
         if (k === -1) s.hidden.push(id); else s.hidden.splice(k, 1);
       });
     }
+    if (t.hasAttribute('data-pkg')) {
+      var pid = t.getAttribute('data-pkg'), sel = pkgSel(), j = sel.indexOf(pid);
+      if (j === -1) sel.push(pid); else sel.splice(j, 1);
+      if (!sel.length) return toast('اختار باقة وحدة على الأقل');
+      return sendPkg(sel);
+    }
+  });
+  document.addEventListener('click', function (e) {
+    if (e.target.id === 'pkgAll') return sendPkg(((state && state.xcats) || []).map(function (c) { return c.id; }));
+    if (e.target.id === 'pkgNone') return toast('لازم باقة وحدة على الأقل — علّم اللي بدك');
   });
 
   $('addForm').addEventListener('submit', function (e) {
