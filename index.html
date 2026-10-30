@@ -183,6 +183,15 @@ input.ltr{direction:ltr;text-align:left}
     return;
   }
 
+  // نحفظ آخر حالة محلياً، فالصفحة بتورجي القوائم حتى لو التلفزيون مطفي
+  var SKEY = 'arabtv_state_' + topic;
+  function saveState() { try { if (state) localStorage.setItem(SKEY, JSON.stringify(state)); } catch (e) {} }
+  (function () {
+    try { var raw = localStorage.getItem(SKEY); if (raw) state = JSON.parse(raw); } catch (e) {}
+    if (!state) state = { v: 1, lists: [], active: -1, x: null, favs: [], hidden: [], cats: [], rev: 0, ts: 0 };
+    render(); refreshStatus();
+  })();
+
   // ----- الاستقبال -----
   function onMsg(msg) {
     if (!msg || msg.event !== 'message' || !msg.message) return;
@@ -191,21 +200,21 @@ input.ltr{direction:ltr;text-align:left}
     if (d.from === 'tv') {
       lastTv = d.ts || Date.now();
       if (waitingRev && d.ack >= waitingRev) { waitingRev = 0; toast('✓ التلفزيون طبّق التغيير'); }
-    }
-    if (!state || (d.ts || 0) >= (state.ts || 0)) { state = d; render(); }
+      // التلفزيون هو المرجع: ناخد منه القوائم والتصنيفات
+      state = d; saveState(); render();
+    } else if (!state || (d.ts || 0) >= (state.ts || 0)) { state = d; saveState(); render(); }
     refreshStatus();
   }
   function refreshStatus() {
     if (waitingRev) return setStatus('wait', 'عم نستنّى التلفزيون...');
     if (lastTv && Date.now() - lastTv < 50 * 60000) setStatus('on', 'التلفزيون متصل · آخر تحديث ' + ago(lastTv));
-    else if (state) setStatus('wait', 'التلفزيون مش ظاهر هلّق، التغييرات بتوصل لما يشتغل');
+    else setStatus('wait', 'التلفزيون مش ظاهر هلّق، التغييرات محفوظة وبتوصل لما يشتغل');
   }
   function first() {
     fetch(NTFY + topic + '/json?poll=1&since=latest').then(function (r) { return r.text(); }).then(function (t) {
       var lines = t.trim().split('\n').filter(Boolean);
       if (lines.length) { try { onMsg(JSON.parse(lines[lines.length - 1])); } catch (e) {} }
-      if (!state) gate('📺', 'شغّل التطبيق على التلفزيون', 'افتح <b>ArabTV</b> على التلفزيون واستنّى ثواني، وهالصفحة بتتعبّى لحالها.');
-    }).catch(function () { setStatus('', 'ما في إنترنت؟ جرّب مرة تانية'); });
+    }).catch(function () {});
     try {
       var es = new EventSource(NTFY + topic + '/sse');
       es.onmessage = function (e) { try { onMsg(JSON.parse(e.data)); } catch (err) {} };
@@ -215,14 +224,13 @@ input.ltr{direction:ltr;text-align:left}
 
   // ----- الإرسال -----
   function send(mutate, note) {
-    if (!state) return;
-    var s = JSON.parse(JSON.stringify(state));
+    var s = JSON.parse(JSON.stringify(state || { lists: [], active: -1, favs: [], hidden: [], rev: 0 }));
     mutate(s);
-    s.v = 1; s.from = 'phone'; s.rev = (state.rev || 0) + 1; s.ts = Date.now(); delete s.ack;
-    state = s; waitingRev = s.rev; render(); refreshStatus();
+    s.v = 1; s.from = 'phone'; s.rev = (state && state.rev || 0) + 1; s.ts = Date.now(); delete s.ack;
+    state = s; waitingRev = s.rev; saveState(); render(); refreshStatus();
     fetch(NTFY + topic, { method: 'POST', body: JSON.stringify(s) })
-      .then(function (r) { if (!r.ok) throw 0; toast(note || 'انبعت للتلفزيون'); })
-      .catch(function () { waitingRev = 0; toast('ما انبعت، تأكد من الإنترنت'); refreshStatus(); });
+      .then(function (r) { if (!r.ok) throw 0; toast(note || 'انحفظ'); })
+      .catch(function () { waitingRev = 0; toast('انحفظ محلياً، بيوصل للتلفزيون لما يرجع النت'); refreshStatus(); });
   }
 
   // ----- العرض -----
@@ -264,7 +272,7 @@ input.ltr{direction:ltr;text-align:left}
   // ----- الأحداث -----
   document.addEventListener('click', function (e) {
     var t = e.target.closest('[data-a],[data-del],[data-fav],[data-cat]');
-    if (!t || !state) return;
+    if (!t) return;
     if (t.hasAttribute('data-del')) {
       var i = +t.getAttribute('data-del');
       if (pendingDel !== i) { pendingDel = i; render(); setTimeout(function () { if (pendingDel === i) { pendingDel = null; render(); } }, 3500); return; }
@@ -298,14 +306,13 @@ input.ltr{direction:ltr;text-align:left}
     e.preventDefault();
     var u = $('lUrl').value.trim(), n = $('lName').value.trim();
     if (!/^https?:\/\/\S+$/i.test(u)) return toast('الرابط لازم يبلّش بـ http');
-    if (!state) return;
-    send(function (s) { s.lists = s.lists || []; s.lists.push({ n: n || ('قائمة ' + (s.lists.length + 1)), u: u }); s.active = s.lists.length - 1; }, 'انضافت، والتلفزيون عم يحمّلها...');
+    send(function (s) { s.lists = s.lists || []; s.lists.push({ n: n || ('قائمة ' + (s.lists.length + 1)), u: u }); s.active = s.lists.length - 1; }, 'انضافت القائمة');
     $('lUrl').value = ''; $('lName').value = '';
   });
 
   $('lFile').addEventListener('change', function () {
     var f = this.files && this.files[0]; this.value = '';
-    if (!f || !state) return;
+    if (!f) return;
     if (f.size > 14 * 1024 * 1024) return toast('الملف كبير كتير (الحد 14 ميغا)');
     var rd = new FileReader();
     rd.onload = function () {
