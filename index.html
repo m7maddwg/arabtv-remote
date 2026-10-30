@@ -167,6 +167,8 @@ input.ltr{direction:ltr;text-align:left}
   if (m) ls('arabtv_topic', topic);
 
   var state = null, lastTv = 0, waitingRev = 0, pendingDel = null, toastT;
+  var xcatsFile = null, xcatsFileUrl = '';
+  function effXcats() { return (state && (state.xcats || xcatsFile)) || []; }
 
   function toast(t) {
     var el = $('toast'); el.textContent = t; el.classList.add('show');
@@ -289,8 +291,14 @@ input.ltr{direction:ltr;text-align:left}
       return '<button class="chip' + (hidden.indexOf(c.id) !== -1 ? ' off' : '') + '" data-cat="' + esc(c.id) + '">' + esc(c.n) + ' <small>' + c.c + '</small></button>';
     }).join('') : '<div class="empty">التصنيفات بتظهر بعد ما التلفزيون يحمّل القنوات</div>';
 
-    // باقات الاشتراك
-    var xcats = state.x ? (state.xcats || []) : [];
+    // باقات الاشتراك — صغيرة من الحالة، كبيرة من ملف
+    var xcats = state.x ? (state.xcats || xcatsFile || []) : [];
+    if (state.x && state.xcatsUrl && state.xcatsUrl !== xcatsFileUrl) {
+      xcatsFileUrl = state.xcatsUrl;
+      fetch(state.xcatsUrl).then(function (r) { return r.json(); }).then(function (list) {
+        if (Array.isArray(list)) { xcatsFile = list; render(); }
+      }).catch(function () {});
+    }
     $('pkgSec').hidden = !xcats.length;
     if (xcats.length) {
       var xsel = state.xsel === 'all' ? xcats.map(function (c) { return c.id; }) : (state.xsel || []);
@@ -301,11 +309,11 @@ input.ltr{direction:ltr;text-align:left}
     }
   }
   function pkgSel() {
-    var xcats = (state && state.xcats) || [];
+    var xcats = effXcats();
     return state.xsel === 'all' ? xcats.map(function (c) { return c.id; }) : ((state && state.xsel) || []).slice();
   }
   function sendPkg(sel) {
-    var all = ((state && state.xcats) || []).map(function (c) { return c.id; });
+    var all = effXcats().map(function (c) { return c.id; });
     var val = sel.length === all.length ? 'all' : sel;
     send(function (s) { s.xsel = val; }, 'التلفزيون عم يحمّل الباقات...');
   }
@@ -349,7 +357,7 @@ input.ltr{direction:ltr;text-align:left}
     }
   });
   document.addEventListener('click', function (e) {
-    if (e.target.id === 'pkgAll') return sendPkg(((state && state.xcats) || []).map(function (c) { return c.id; }));
+    if (e.target.id === 'pkgAll') return sendPkg(effXcats().map(function (c) { return c.id; }));
     if (e.target.id === 'pkgNone') return toast('لازم باقة وحدة على الأقل — علّم اللي بدك');
   });
 
