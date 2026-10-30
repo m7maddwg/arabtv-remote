@@ -178,8 +178,19 @@ input.ltr{direction:ltr;text-align:left}
   }
 
   if (!topic) {
-    gate('📺', 'افتح الرمز من التلفزيون', 'بالتطبيق على التلفزيون روح على <b>الإعدادات ← 📱 التحكم من الموبايل</b>، وصوّر الرمز اللي بيطلع.');
     setStatus('', 'مش مربوط');
+    $('main').hidden = true; $('dock').hidden = true;
+    var g = $('gate'); g.hidden = false;
+    g.innerHTML = '<div class="big">📺</div><h2>اربط الصفحة بتلفزيونك</h2>' +
+      '<p>بالتطبيق على التلفزيون: <b>الإعدادات ← 📱 التحكم من الموبايل</b>. صوّر الـ QR بالموبايل، أو الصق هون الرابط اللي تحته (اللي فيه <code>#t=</code>):</p>' +
+      '<input id="pasteLink" class="ltr" placeholder="https://m7maddwg.github.io/arabtv-remote/#t=..." style="width:100%;max-width:420px">' +
+      '<button class="btn primary" id="linkBtn" style="max-width:420px;width:100%">ربط</button>';
+    $('linkBtn').addEventListener('click', function () {
+      var v = $('pasteLink').value.trim();
+      var mm = v.match(/t=([a-z0-9-]{10,60})/i) || v.match(/^(arabtv-[a-z0-9]{10,})$/i);
+      if (!mm) return toast('الصق الرابط الكامل اللي فيه #t=');
+      location.hash = 't=' + mm[1]; location.reload();
+    });
     return;
   }
 
