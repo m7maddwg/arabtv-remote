@@ -262,7 +262,7 @@ input.ltr{direction:ltr;text-align:left}
     $('gate').hidden = true; $('main').hidden = false; $('dock').hidden = false;
     var lists = state.lists || [], act = typeof state.active === 'number' ? state.active : -1;
     var html = '<div class="item' + (act === -1 && !state.x ? ' on' : '') + '" data-a="-1"><span class="radio"></span>' +
-      '<div class="it-main" data-a="-1"><div class="it-name">القنوات العربية المجانية</div><div class="it-sub">iptv-org · افتراضي</div></div></div>';
+      '<div class="it-main" data-a="-1"><div class="it-name">القنوات العربية المجانية</div><div class="it-sub">+430 قناة مجانية · افتراضي</div></div></div>';
     html += lists.map(function (l, i) {
       var sure = pendingDel === i;
       return '<div class="item' + (act === i && !state.x ? ' on' : '') + '"><span class="radio"></span>' +
