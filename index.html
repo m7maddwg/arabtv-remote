@@ -44,6 +44,12 @@ section h2 .n{font-size:12px;font-weight:500;color:var(--muted);background:var(-
 .item.on .radio{border-color:var(--accent)}
 .item.on .radio::after{content:"";width:11px;height:11px;border-radius:50%;background:var(--accent)}
 .it-main{flex:1;min-width:0;cursor:pointer}
+.mergerow{display:flex;align-items:center;gap:10px;padding:12px;border-radius:14px;margin-bottom:10px;background:color-mix(in srgb,var(--accent) 8%,var(--field));border:2px solid color-mix(in srgb,var(--accent) 35%,transparent);cursor:pointer}
+.mergerow .it-main{cursor:pointer}
+.sw{width:46px;height:26px;border-radius:999px;background:var(--muted);flex:0 0 auto;position:relative;transition:background .15s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .15s}
+.mergerow.on .sw{background:var(--accent)}
+.mergerow.on .sw::after{transform:translateX(20px)}
 .it-name{font-weight:700;font-size:15px}
 .it-sub{font-size:12px;color:var(--muted);direction:ltr;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
 .ibtn{border:0;background:transparent;color:var(--muted);font:inherit;font-size:13px;font-weight:700;padding:8px 10px;border-radius:10px;cursor:pointer;flex:0 0 auto}
@@ -97,6 +103,7 @@ input.ltr{direction:ltr;text-align:left}
     <section>
       <h2>📋 قوائم القنوات <span class="n" id="listCount"></span></h2>
       <p class="hint">اضغط على أي قائمة لتصير هي الشغّالة على التلفزيون.</p>
+      <div id="mergeRow" class="mergerow"><div class="it-main"><div class="it-name">🧩 دمج كل المصادر</div><div class="it-sub" style="direction:rtl;text-align:right">كل الروابط والملفات بقائمة وحدة، والمفضلة بتشملهم كلهم</div></div><span class="sw"></span></div>
       <div class="list" id="lists"></div>
       <form id="addForm">
         <label for="lName">إضافة قائمة جديدة</label>
@@ -211,7 +218,7 @@ input.ltr{direction:ltr;text-align:left}
   function saveState() { try { if (state) localStorage.setItem(SKEY, JSON.stringify(state)); } catch (e) {} }
   (function () {
     try { var raw = localStorage.getItem(SKEY); if (raw) state = JSON.parse(raw); } catch (e) {}
-    if (!state) state = { v: 1, lists: [], active: -1, x: null, favs: [], hidden: [], cats: [], rev: 0, ts: 0 };
+    if (!state) state = { v: 1, lists: [], active: -1, x: null, favs: [], hidden: [], cats: [], rev: 0, ts: 0, mergeAll: true };
     render(); refreshStatus();
   })();
 
@@ -271,7 +278,11 @@ input.ltr{direction:ltr;text-align:left}
     }).join('');
     $('lists').innerHTML = html;
     $('listCount').textContent = (lists.length + 1) + '';
-    if (state.x) $('lists').insertAdjacentHTML('afterbegin', '<div class="empty">الاشتراك شغّال هلّق، فالقنوات بتيجي منه. شيل الاشتراك لترجع للقوائم.</div>');
+    var merged = state.mergeAll !== false;   // الافتراضي: مفعّل
+    $('mergeRow').classList.toggle('on', merged);
+    $('lists').style.opacity = merged ? '.55' : '1';
+    if (merged) $('lists').insertAdjacentHTML('afterbegin', '<div class="empty">🧩 الدمج شغّال — كل المصادر بتظهر سوا، والمفضلة بتشملهم كلهم. طفّي الدمج لو بدك تتصفّح مصدر لحاله.</div>');
+    else if (state.x) $('lists').insertAdjacentHTML('afterbegin', '<div class="empty">الاشتراك شغّال هلّق، فالقنوات بتيجي منه. شيل الاشتراك لترجع للقوائم.</div>');
 
     var x = state.x;
     $('xBadge').innerHTML = x ? '<span class="badge">متصل</span>' : '';
@@ -319,6 +330,10 @@ input.ltr{direction:ltr;text-align:left}
   }
 
   // ----- الأحداث -----
+  document.getElementById('mergeRow').addEventListener('click', function () {
+    var now = state && state.mergeAll !== false;
+    send(function (s) { s.mergeAll = !now; }, now ? 'طفّينا الدمج — رجعنا للقوائم المنفصلة' : '🧩 عم ندمج كل المصادر على التلفزيون...');
+  });
   document.addEventListener('click', function (e) {
     var t = e.target.closest('[data-a],[data-del],[data-fav],[data-cat],[data-pkg]');
     if (!t) return;
@@ -333,6 +348,7 @@ input.ltr{direction:ltr;text-align:left}
     }
     if (t.hasAttribute('data-a')) {
       var a = +t.getAttribute('data-a');
+      if (state.mergeAll !== false) return send(function (s) { s.mergeAll = false; s.active = a; }, 'طفّينا الدمج وعم نفتح هالقائمة...');
       if (state.x) return toast('شيل الاشتراك أول لتختار قائمة');
       if (a === state.active) return;
       return send(function (s) { s.active = a; }, 'التلفزيون عم يحمّل القائمة...');
